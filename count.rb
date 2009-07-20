@@ -861,21 +861,20 @@ young
 class Counter
   
   def initialize
-    @length = 100 # klienta stos HD
+    @mutex = Mutex.new # raczej nie potrzebne
+    @length = 101 # klienta stos HD
     @sentence = "" # zdanie ktore jest powiazane z HD stosu
-    @mutex = Mutex.new
   end
   
   def main     
     DRb.start_service
-#    obj = DRbObject.new(nil,'druby://localhost:6666') # dowiazanie z serwerem
      obj = Rinda::TupleSpaceProxy.new(DRbObject.new_with_uri('druby://127.0.0.1:6666'))
-      x = Thread.new do     
+      x = Thread.new do 
         loop do
-          sleep 3
-          length_server = obj.take([:result,nil])
-          @length = length_server.last if @length > length_server.last
-          obj.write([:result,@length,@sentence]) if @length < length_server.last # wysyla wynik na serwer
+          sleep 2
+          length_server = obj.take([:result,nil,nil])
+          @length = length_server[1] if @length > length_server[1]
+          obj.write([:result,@length,@sentence]) if @length < length_server[1] # wysyla wynik na serwer
         end
       end
     
@@ -888,7 +887,7 @@ class Counter
               12.times {slowa << " #{@@wordz[rand(@@wordz.size)]}"}
               bar = Digest::SHA1.hexdigest(slowa.lstrip!).hex
               distance = (foo^bar).to_s(2).count("1")
-	           (@length = distance and @sentence = slowa ) if distance < @length
+	      (@length = distance and @sentence = slowa ) if distance < @length
             end
           end
       end
