@@ -1,6 +1,7 @@
 require 'drb'
 require 'digest/sha1'
 require 'rinda/tuplespace'
+require 'thread'
 
 @@zdanie = "I am not a big believer in fortune telling"
 
@@ -858,7 +859,6 @@ young
 )
 
 class Counter
-require 'thread'
   
   def initialize
     @length = 100 # klienta stos HD
@@ -868,22 +868,20 @@ require 'thread'
   
   def main     
     DRb.start_service
-    obj = DRbObject.new(nil,'druby://localhost:6666') # dowiazanie z serwerem
-    server = Thread.new do 
-      loop do 
-        @mutex.synchronize do
-          sleep 2
-          length_server = obj.read[:result,nil]
-          @length = length_server if @length > length_server # aktualizuje lokalny stos HD (wynikiem z serwera)
-          obj.write[:result,@length,@sentence] if @length < length_server # wysyla wynik na serwer
+#    obj = DRbObject.new(nil,'druby://localhost:6666') # dowiazanie z serwerem
+     obj = Rinda::TupleSpaceProxy.new(DRbObject.new_with_uri('druby://127.0.0.1:6666'))
+      x = Thread.new do     
+        loop do
+          sleep 3
+          length_server = obj.take([:result,nil])
+          @length = length_server.last if @length > length_server.last
+          obj.write([:result,@length,@sentence]) if @length < length_server.last # wysyla wynik na serwer
         end
       end
-    end
     
     foo = Digest::SHA1.hexdigest("#{@@zdanie}").hex
-    countz = Thread.new do
+    q = Thread.new do 
       loop do
-        @mutex.synchronize do
           500_000.times do 
             4_000_000.times do
               slowa = ""
@@ -893,9 +891,10 @@ require 'thread'
 	           (@length = distance and @sentence = slowa ) if distance < @length
             end
           end
-        end
       end
     end
+x.join
+q.join
   end
 end
 
